@@ -23,7 +23,8 @@ private object Versions {
     const val constraintLayout = "2.1.1"
     const val lifecycleExtensions = "2.2.0"
     const val viewpager2 = "1.0.0"
-    const val fragmentTesting = "1.4.0-alpha09"
+    const val activityKtx = "1.4.0"
+    const val fragmentKtx = "1.4.0-rc01"
 
     // Third party Libraries
     const val desugar = "1.1.5"
@@ -60,7 +61,9 @@ object Libs {
     val rxAndroid = "io.reactivex.rxjava3:rxandroid:${Versions.rxAndroid}"
     val circleindicator = "me.relex:circleindicator:${Versions.circleindicator}"
     val viewpager2 = "androidx.viewpager2:viewpager2:${Versions.viewpager2}"
-    val fragmentTesting = "androidx.fragment:fragment-testing:${Versions.fragmentTesting}"
+    val activityKtx = "androidx.activity:activity-ktx:${Versions.activityKtx}"
+    val fragmentKtx = "androidx.fragment:fragment-ktx:${Versions.fragmentKtx}"
+    val fragmentTesting = "androidx.fragment:fragment-testing:${Versions.fragmentKtx}"
     val navigationFragmentKtx = "androidx.navigation:navigation-fragment-ktx:${Versions.navigation}"
     val navigationUiKtx = "androidx.navigation:navigation-ui-ktx:${Versions.navigation}"
     val viewBindingDelegate = "com.github.Zhuinden:fragmentviewbindingdelegate-kt:${Versions.viewBindingDelegate}"

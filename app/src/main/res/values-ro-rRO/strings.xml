@@ -7,6 +7,12 @@
     <string name="loading_label">Loading…</string>
 
     <!-- Permissions-->
+    <string name="permission_required_notice">Localizarea necesită permisiune deoarece este funcționalitatea de bază!</string>
+    <string name="permission_btn_settings">Setări</string>
+    <string name="permission_info_title">Permisiune necesară</string>
+    <string name="permission_info_content">Pentru a-ți selecta adresa trebuie sa accesăm localizarea. În următorul
+        dialog ți se va cere să permiți accesul la localizare.</string>
+    <string name="permission_info_btn">Am înțeles</string>
     <string name="permission_permanently_denied_title">Permisiune necesară</string>
     <string name="permission_permanently_denied_msg">Pentru a utiliza această funcționalitate, trebuie să modificați permisiunile aplicației. Vă rugăm să deschideți meniul Setări și să acordați acces la permisiunile solicitate.</string>
     <string name="permission_permanently_denied_settings_button">Setări</string>

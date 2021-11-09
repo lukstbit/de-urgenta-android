@@ -133,6 +133,8 @@ dependencies {
     implementation(Libs.rxAndroid)
     implementation(Libs.circleindicator)
     implementation(Libs.viewpager2)
+    implementation(Libs.activityKtx)
+    implementation(Libs.fragmentKtx)
     debugImplementation(Libs.fragmentTesting)
     implementation(Libs.navigationFragmentKtx)
     implementation(Libs.navigationUiKtx)

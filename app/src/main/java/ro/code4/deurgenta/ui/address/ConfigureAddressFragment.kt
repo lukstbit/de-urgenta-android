@@ -1,14 +1,19 @@
 package ro.code4.deurgenta.ui.address
 
+import android.Manifest
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.app.SearchManager
 import android.content.Intent
 import android.content.IntentSender
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.database.MatrixCursor
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.BaseColumns
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,21 +21,30 @@ import android.widget.CursorAdapter
 import android.widget.SearchView
 import android.widget.SimpleCursorAdapter
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.databinding.DataBindingUtil
 import androidx.navigation.fragment.findNavController
-import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.material.snackbar.Snackbar
 import com.here.sdk.mapview.MapView
 import com.here.sdk.search.Suggestion
+import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import ro.code4.deurgenta.R
 import ro.code4.deurgenta.data.model.MapAddressType
 import ro.code4.deurgenta.databinding.FragmentConfigureAddressBinding
-import ro.code4.deurgenta.helper.*
+import ro.code4.deurgenta.helper.MapViewUtils
+import ro.code4.deurgenta.helper.getPermissionStatus
+import ro.code4.deurgenta.helper.hideSoftInput
+import ro.code4.deurgenta.helper.logD
+import ro.code4.deurgenta.helper.logI
+import ro.code4.deurgenta.helper.setToRotateIndefinitely
+import ro.code4.deurgenta.helper.showPermissionExplanation
 import ro.code4.deurgenta.interfaces.ClickButtonCallback
-import ro.code4.deurgenta.ui.base.PermissionsViewModelFragment
+import ro.code4.deurgenta.ui.base.ViewModelFragment
 
 @SuppressLint("LongLogTag")
-class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressViewModel>() {
+@Suppress("TooManyFunctions")
+class ConfigureAddressFragment : ViewModelFragment<ConfigureAddressViewModel>() {
 
     override val layout: Int
         get() = R.layout.fragment_configure_address
@@ -39,12 +53,36 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
         get() = R.string.configure_addresses
 
     override val viewModel: ConfigureAddressViewModel by viewModel()
+    private val sharedPreferences: SharedPreferences by inject()
     private lateinit var mapView: MapView
     private var mapViewUtils: MapViewUtils? = null
     lateinit var viewBinding: FragmentConfigureAddressBinding
-    var mapAddressType: MapAddressType = MapAddressType.HOME
+    private var mapAddressType: MapAddressType = MapAddressType.HOME
     private var loadingAnimator: ObjectAnimator? = null
     private fun searchView() = viewBinding.appbarSearch.querySearch
+    private val locationPermissionRequest =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                logI("Access to location was granted", TAG)
+                permissionNotice?.dismiss()
+                mapViewUtils?.startLocationUpdates()
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (getPermissionStatus(
+                            requireContext(),
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        logI("Access to location was NOT granted", TAG)
+                        showPermissionRequiredNotice()
+                    }
+                } else {
+                    logI("Access to location was NOT granted", TAG)
+                    showPermissionRequiredNotice()
+                }
+            }
+        }
+    private var permissionNotice: Snackbar? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -57,7 +95,11 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        if (!sharedPreferences.getBoolean(PREFS_HAS_SEEN_PERMISSION_NOTICE, false)) {
+            showPermissionExplanation(requireContext(), sharedPreferences) { initiatePermissionRequest() }
+        } else {
+            initiatePermissionRequest()
+        }
         viewBinding.lifecycleOwner = viewLifecycleOwner
         viewBinding.appbarSearch.toolbarSearch.setOnClickListener {
             findNavController().navigate(R.id.back_to_configure_profile)
@@ -106,37 +148,19 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
         mapViewUtils?.onPause()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        when (requestCode) {
-            PermissionManager.PERMISSION_CHECK_SETTINGS -> when (resultCode) {
-                Activity.RESULT_OK -> {
-                    logI("User agreed to make required location settings changes.", TAG)
-                    mapViewUtils?.startLocationUpdates()
-                }
-                Activity.RESULT_CANCELED -> {
-                    logI("User chose not to make required location settings changes.", TAG)
-                }
-            }
-        }
-    }
-
     private fun initCallbacks() {
-        viewBinding.saveAddressCallback = object : ClickButtonCallback {
-            override fun call() {
-                mapViewUtils?.getCurrentAddress()
-                    ?.let { mapAddress ->
-                        mapAddress.type = mapAddressType
-                        viewModel.saveAddress(mapAddress)
-                    }
-            }
+        viewBinding.saveAddressCallback = ClickButtonCallback {
+            mapViewUtils?.getCurrentAddress()
+                ?.let { mapAddress ->
+                    mapAddress.type = mapAddressType
+                    viewModel.saveAddress(mapAddress)
+                }
         }
 
-        viewBinding.locateMeCallback = object : ClickButtonCallback {
-            override fun call() {
-                searchView().clearFocus()
-                setQuery("", false)
-                mapViewUtils?.loadLastKnownLocation(true)
-            }
+        viewBinding.locateMeCallback = ClickButtonCallback {
+            searchView().clearFocus()
+            setQuery("", false)
+            mapViewUtils?.loadLastKnownLocation(true)
         }
     }
 
@@ -191,7 +215,7 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
                 val cursor = searchView().suggestionsAdapter.cursor
                 cursor.moveToPosition(position)
                 val selection =
-                    cursor.getString(cursor.getColumnIndex(SearchManager.SUGGEST_COLUMN_TEXT_1))
+                    cursor.getString(cursor.getColumnIndexOrThrow(SearchManager.SUGGEST_COLUMN_TEXT_1))
                 setQuery(selection, true)
                 return true
             }
@@ -213,12 +237,8 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
             }
             if (error.errorType == MapViewUtils.MapErrorType.PERMISSION_ERROR) {
                 try {
-                    // shows the permission request settings dialog.
-                    val rae = error.exception as ResolvableApiException
-                    startIntentSenderForResult(
-                        rae.resolution.intentSender,
-                        PermissionManager.PERMISSION_CHECK_SETTINGS
-                    )
+                    // ignored
+                    // the app itself will handle the location permission
                 } catch (sie: IntentSender.SendIntentException) {
                     logI(TAG, "PendingIntent unable to execute request.")
                 }
@@ -251,17 +271,6 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
         }
     }
 
-    override fun onPermissionsGranted() {
-        logD("permission granted.", TAG)
-        mapViewUtils?.startLocationUpdates()
-    }
-
-    override fun onPermissionDenied() {
-        logE("Permissions denied by user, return back to the configure profile.", TAG)
-        // todo if permission was denied before notify the user, maybe one changes its mind.
-        findNavController().navigate(R.id.configure_account)
-    }
-
     private fun updateSaveButtonVisibility(flag: Int) {
         viewBinding.mapViewLayout.saveAddress.visibility = flag
     }
@@ -280,11 +289,39 @@ class ConfigureAddressFragment : PermissionsViewModelFragment<ConfigureAddressVi
     }
 
     override fun handleOnBackPressedInternal() {
+        permissionNotice?.dismiss()
         val directions = ConfigureAddressFragmentDirections.backToConfigureProfile()
         findNavController().navigate(directions)
     }
 
+    private fun showPermissionRequiredNotice() {
+        permissionNotice =
+            Snackbar.make(viewBinding.root, getString(R.string.permission_required_notice), Snackbar.LENGTH_INDEFINITE)
+        val appSettingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            data = Uri.fromParts(SCHEME_PACKAGE, requireActivity().packageName, null)
+        }
+        if (appSettingsIntent.resolveActivity(requireActivity().packageManager) != null) {
+            permissionNotice?.setAction(getString(R.string.permission_btn_settings)) {
+                startActivity(appSettingsIntent)
+            }
+        }
+        permissionNotice?.show()
+    }
+
+    private fun initiatePermissionRequest() {
+        if (getPermissionStatus(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            locationPermissionRequest.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
     companion object {
         const val TAG: String = "ConfigureAccountFragment"
+        const val SCHEME_PACKAGE = "package"
+        const val PREFS_HAS_SEEN_PERMISSION_NOTICE = "prefs_has_seen_permission_notice"
     }
 }

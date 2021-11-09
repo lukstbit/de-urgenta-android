@@ -4,7 +4,6 @@ import android.animation.ObjectAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.IntentSender
 import android.graphics.Rect
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -41,7 +40,8 @@ fun Fragment.startActivityWithoutTrace(activity: Class<*>) {
 }
 
 fun FragmentManager.replaceFragment(
-    @IdRes layoutRes: Int, fragment: Fragment,
+    @IdRes layoutRes: Int,
+    fragment: Fragment,
     bundle: Bundle? = null,
     tag: String? = null,
     isPrimaryNavigationFragment: Boolean = false
@@ -68,7 +68,7 @@ fun Context.isOnline(): Boolean {
         val n = cm.activeNetwork
         if (n != null) {
             val nc = cm.getNetworkCapabilities(n)
-            //It will check for both wifi and cellular network
+            // It will check for both wifi and cellular network
             return nc!!.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || nc.hasTransport(
                 NetworkCapabilities.TRANSPORT_WIFI
             )
@@ -141,10 +141,6 @@ fun Activity.takeUserTo(url: String) {
     } else {
         Toast.makeText(this, R.string.about_no_url_handler, Toast.LENGTH_SHORT).show()
     }
-}
-
-fun Fragment.startIntentSenderForResult(intent: IntentSender, requestCode: Int, bundle: Bundle? = null) {
-    startIntentSenderForResult(intent, requestCode, null, 0, 0, 0, bundle)
 }
 
 fun Fragment.updateActivityTitle(newTitle: String) {
